@@ -67,16 +67,16 @@ export const getAllStudents = async (req, res) => {
 
 export const getStudentsForTeacher = async (req, res) => {
   try {
-    console.log("👩‍🏫 Teacher Info:", req.user);
+
     const teacherClasses = req.user.assignedClasses;
-    console.log("🎓 Assigned Classes:", teacherClasses);
+   
 
     if (!teacherClasses || teacherClasses.length === 0) {
       return res.status(403).json({ message: "No assigned classes" });
     }
 
     const students = await Student.find({ class: { $in: teacherClasses } });
-    console.log("📚 Students Found:", students.length);
+    
     res.json(students);
   } catch (err) {
     console.error(err);
