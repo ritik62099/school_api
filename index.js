@@ -13,7 +13,11 @@ dotenv.config();
 connectDB();
 
 const app = express();
-app.use(cors({ origin: 'https://school-frontend-drab.vercel.app/' }));
+// Allow your Vercel frontend (no trailing slash, no spaces!)
+app.use(cors({
+  origin: 'https://school-frontend-drab.vercel.app',
+  credentials: true // optional, but good if you plan to use cookies later
+}));
 
 // app.use(cors({
 //   origin: 'http://localhost:5173', // ← Add your frontend URLs
