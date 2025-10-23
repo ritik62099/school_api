@@ -13,7 +13,7 @@ dotenv.config();
 connectDB();
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: 'http://localhost:5173' }));
 
 
 // ✅ Allow larger JSON payloads (for non-file requests)
