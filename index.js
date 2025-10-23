@@ -13,12 +13,12 @@ dotenv.config();
 connectDB();
 
 const app = express();
-// app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors({ origin: 'http://localhost:5173' }));
 
-app.use(cors({
-  origin: 'http://localhost:5173', // ← Add your frontend URLs
-  credentials: true // if using cookies (optional)
-}));
+// app.use(cors({
+//   origin: 'http://localhost:5173', // ← Add your frontend URLs
+//   credentials: true // if using cookies (optional)
+// }));
 
 // ✅ Allow larger JSON payloads (for non-file requests)
 app.use(express.json({ limit: '10mb' }));
