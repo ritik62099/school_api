@@ -81,4 +81,4 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // ✅ ESM ke liye: default export karein
-export default mongoose.model('User', userSchema);
+export default mongoose.model('schoolteacher', userSchema);
