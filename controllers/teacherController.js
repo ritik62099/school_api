@@ -85,3 +85,15 @@ export const updateAttendanceAccess = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+export const deleteTeacher = async (req, res) => {
+  try {
+    const teacher = await User.findByIdAndDelete(req.params.id);
+    if (!teacher) {
+      return res.status(404).json({ message: 'Teacher not found' });
+    }
+    res.json({ message: 'Teacher deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};

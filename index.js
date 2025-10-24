@@ -14,15 +14,22 @@ connectDB();
 
 const app = express();
 // Allow your Vercel frontend (no trailing slash, no spaces!)
-app.use(cors({
-  origin: 'https://school-frontend-drab.vercel.app',
-  credentials: true // optional, but good if you plan to use cookies later
-}));
-
 // app.use(cors({
-//   origin: 'http://localhost:5173', // ← Add your frontend URLs
-//   credentials: true // if using cookies (optional)
+//   origin: 'https://school-frontend-drab.vercel.app',
+//   credentials: true // optional, but good if you plan to use cookies later
 // }));
+
+const corsOptions = {
+  origin: [
+    'http://localhost:5173', // or whatever port you use locally
+    'https://school-frontend-drab.vercel.app'
+  ],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+
+
 
 // ✅ Allow larger JSON payloads (for non-file requests)
 app.use(express.json({ limit: '10mb' }));
