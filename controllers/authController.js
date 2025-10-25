@@ -189,31 +189,33 @@ const requestOtp = async (req, res) => {
   }
 };
 
-// @desc    Signup with OTP verification
+// @desc    Signup user (no OTP)
 // @route   POST /api/auth/signup
 const signup = async (req, res) => {
-  const { name, email, password, otp } = req.body;
-  if (!name || !email || !password || !otp)
+  const { name, email, password } = req.body;
+  if (!name || !email || !password)
     return res.status(400).json({ message: 'All fields are required.' });
 
   try {
-    const user = await User.findOne({ email });
-    if (!user || !user.otp) return res.status(400).json({ message: 'OTP not requested for this email.' });
-    if (user.otp !== otp) return res.status(400).json({ message: 'Invalid OTP.' });
-    if (new Date() > user.otpExpires) return res.status(400).json({ message: 'OTP expired.' });
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered.' });
+    }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    user.name = name;
-    user.password = hashedPassword;
-    user.otp = undefined;
-    user.otpExpires = undefined;
-    user.isOtpOnly = false;
-    user.role = 'teacher';
-    user.isApproved = false;
-    user.assignedClasses = user.assignedClasses || [];
-    user.assignedSubjects = user.assignedSubjects || [];
+    const user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      role: 'teacher',
+      isApproved: false,
+      assignedClasses: [],
+      assignedSubjects: [],
+      canMarkAttendance: false,
+    });
+
     await user.save();
 
     const token = jwt.sign(
