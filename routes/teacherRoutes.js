@@ -8,8 +8,8 @@ const router = Router();
 router.get('/count', getTeacherCount);
 router.get('/', getAllTeachers);
 router.patch('/:id/approve', auth, approveTeacher);
-router.patch('/assign/:id', auth, assignClassSubject);
-router.patch('/attendance-access/:id', auth, updateAttendanceAccess);
+router.patch('/:id/assign', auth, assignClassSubject); // ✅ Fixed
+router.patch('/:id/attendance-access', auth, updateAttendanceAccess); // ✅ Fixed
 router.delete('/:id', auth, deleteTeacher);
 
 export default router;
