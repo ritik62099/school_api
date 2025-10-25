@@ -7,7 +7,7 @@ const router = Router();
 
 router.get('/count', getTeacherCount);
 router.get('/', getAllTeachers);
-router.patch('/approve/:id', auth, approveTeacher);
+router.patch('/:id/approve', auth, approveTeacher);
 router.patch('/assign/:id', auth, assignClassSubject);
 router.patch('/attendance-access/:id', auth, updateAttendanceAccess);
 router.delete('/:id', auth, deleteTeacher);
