@@ -8,16 +8,12 @@ import studentRoutes from "./routes/studentRoutes.js";
 import teacherRoutes from "./routes/teacherRoutes.js";
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import marksRoutes from "./routes/markRoutes.js";
+import classSubjectRoutes from './routes/classSubjectRoutes.js';
 
 dotenv.config();
 connectDB();
 
 const app = express();
-// Allow your Vercel frontend (no trailing slash, no spaces!)
-// app.use(cors({
-//   origin: 'https://school-frontend-drab.vercel.app',
-//   credentials: true // optional, but good if you plan to use cookies later
-// }));
 
 const corsOptions = {
   origin: [
@@ -46,6 +42,7 @@ app.use("/api/teachers", teacherRoutes); // ← plural "teachers"
 app.use('/api/attendance', attendanceRoutes);
 
 app.use("/api/marks", marksRoutes);
+app.use('/api', classSubjectRoutes);
 
 app.get("/", (req, res) => {
     res.send("Hello from Express on Vercel!");
