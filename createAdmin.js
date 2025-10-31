@@ -1,44 +1,44 @@
-// // server/seeds/adminSeed.js
-// import mongoose from 'mongoose';
-// import bcrypt from 'bcryptjs';
-// import User from './models/User.js';
-// import dotenv from 'dotenv';
+// server/seeds/adminSeed.js
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+import User from './models/User.js';
+import dotenv from 'dotenv';
 
-// dotenv.config();
-// const createAdmin = async () => {
-//   try {
-//     await mongoose.connect(process.env.MONGO_URI);
+dotenv.config();
+const createAdmin = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
 
-//     // Check if admin already exists
-//     const existingAdmin = await User.findOne({ email: 'admin@school.com', role: 'admin' });
-//     if (existingAdmin) {
-//       console.log('✅ Admin already exists');
-//       process.exit(0);
-//     }
+    // Check if admin already exists
+    const existingAdmin = await User.findOne({ email: 'admin@school.com', role: 'admin' });
+    if (existingAdmin) {
+      console.log('✅ Admin already exists');
+      process.exit(0);
+    }
 
-//     // Hash password
-//     const salt = await bcrypt.genSalt(10);
-//     const hashedPassword = await bcrypt.hash('admin123', salt);
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash('admin123', salt);
 
-//     // Create admin
-//     const admin = new User({
-//       name: 'School Admin',
-//       email: 'admin@school.com',
-//       password: hashedPassword,
-//       role: 'admin', // ← important
-//       isOtpOnly: false
-//     });
+    // Create admin
+    const admin = new User({
+      name: 'School Admin',
+      email: 'admin@school.com',
+      password: hashedPassword,
+      role: 'admin', // ← important
+      isOtpOnly: false
+    });
 
-//     await admin.save();
-//     console.log('✅ Admin created: admin@school.com / admin123');
-//     process.exit(0);
-//   } catch (err) {
-//     console.error('❌ Admin creation failed:', err);
-//     process.exit(1);
-//   }
-// };
+    await admin.save();
+    console.log('✅ Admin created: admin@school.com / admin123');
+    process.exit(0);
+  } catch (err) {
+    console.error('❌ Admin creation failed:', err);
+    process.exit(1);
+  }
+};
 
-// createAdmin();
+createAdmin();
 
 // // seedExams.js
 // import mongoose from 'mongoose';
