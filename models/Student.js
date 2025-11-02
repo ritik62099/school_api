@@ -13,6 +13,7 @@ const studentSchema = new mongoose.Schema({
   section: { type: String, enum: ["A", "B", "C"], required: true },
   rollNo: { type: String, required: true }, // ✅ String as roll numbers may have leading zeros
   photo: { type: String }, // ✅ Cloudinary URL
+  transport: { type: Boolean, default: false },
   admissionDate: { type: Date, default: Date.now }
 });
 

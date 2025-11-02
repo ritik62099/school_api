@@ -7,21 +7,19 @@ export const addStudent = async (req, res) => {
   try {
     const {
       name, fatherName, motherName, class: studentClass,
-      section, rollNo, mobile, address, aadhar
+      section, rollNo, mobile, address, aadhar, transport
     } = req.body;
 
     const studentData = {
       name, fatherName, motherName, class: studentClass,
-      section, rollNo, mobile, address, aadhar
+      section, rollNo, mobile, address, aadhar,
+      transport: transport === 'true' || transport === true
     };
 
-    // ✅ UPLOAD PHOTO
     if (req.file) {
       try {
-        // Convert buffer to base64
         const fileBase64 = req.file.buffer.toString('base64');
         const fileUri = `data:${req.file.mimetype};base64,${fileBase64}`;
-
         const result = await cloudinary.uploader.upload(fileUri, {
           folder: 'school/students',
           width: 300,
@@ -29,12 +27,9 @@ export const addStudent = async (req, res) => {
           crop: 'fill',
           gravity: 'face'
         });
-
         studentData.photo = result.secure_url;
-        // console.log('✅ Photo URL saved:', result.secure_url);
       } catch (err) {
-        // console.error('❌ Cloudinary error:', err.message);
-        // Don't block student creation if photo fails
+        console.error('Cloudinary error:', err.message);
       }
     }
 
@@ -42,7 +37,7 @@ export const addStudent = async (req, res) => {
     await student.save();
     res.status(201).json(student);
   } catch (err) {
-    // console.error('❌ Student creation error:', err);
+    console.error('Student creation error:', err);
     res.status(400).json({ message: err.message || 'Failed to add student' });
   }
 };
@@ -128,30 +123,34 @@ const deleteFromCloudinary = async (publicId) => {
     console.warn('Cloudinary delete failed:', err.message);
   }
 };
+// Helper function (add at top of controller file)
+const parseBoolean = (val) => {
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'string') {
+    return val.toLowerCase() === 'true';
+  }
+  return false; // default fallback
+};
 
-// 🔄 UPDATE STUDENT
+// Inside updateStudent:
 export const updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
     const {
       name, fatherName, motherName, class: studentClass,
-      section, rollNo, mobile, address, aadhar
+      section, rollNo, mobile, address, aadhar, transport
     } = req.body;
 
-    // Find existing student
     const existingStudent = await Student.findById(id);
     if (!existingStudent) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
     let photoUrl = existingStudent.photo;
-
-    // Handle new photo upload
     if (req.file) {
       try {
         const fileBase64 = req.file.buffer.toString('base64');
         const fileUri = `data:${req.file.mimetype};base64,${fileBase64}`;
-
         const result = await cloudinary.uploader.upload(fileUri, {
           folder: 'school/students',
           width: 300,
@@ -159,22 +158,28 @@ export const updateStudent = async (req, res) => {
           crop: 'fill',
           gravity: 'face'
         });
-
         photoUrl = result.secure_url;
-
-        // ✅ Delete old photo from Cloudinary (optional)
         if (existingStudent.photo) {
           await deleteFromCloudinary(existingStudent.photo);
         }
       } catch (err) {
         console.error('Cloudinary update error:', err.message);
-        // Proceed without new photo if upload fails
       }
     }
 
+    // ✅ Parse transport safely
     const updatedData = {
-      name, fatherName, motherName, class: studentClass,
-      section, rollNo, mobile, address, aadhar, photo: photoUrl
+      name: name || '',
+      fatherName: fatherName || '',
+      motherName: motherName || '',
+      class: studentClass || '',
+      section: section || '',
+      rollNo: rollNo || '',
+      mobile: mobile || '',
+      address: address || '',
+      aadhar: aadhar || '',
+      transport: parseBoolean(transport), // 👈 FIXED
+      photo: photoUrl
     };
 
     const updatedStudent = await Student.findByIdAndUpdate(

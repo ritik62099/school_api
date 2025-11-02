@@ -9,6 +9,9 @@ import teacherRoutes from "./routes/teacherRoutes.js";
 import attendanceRoutes from './routes/attendanceRoutes.js';
 import marksRoutes from "./routes/markRoutes.js";
 import classSubjectRoutes from './routes/classSubjectRoutes.js';
+import classFeeRoutes from './routes/classFeeRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import transportFeeRoutes from './routes/transportFeeRoutes.js';
 
 dotenv.config();
 connectDB();
@@ -43,6 +46,10 @@ app.use('/api/attendance', attendanceRoutes);
 
 app.use("/api/marks", marksRoutes);
 app.use('/api', classSubjectRoutes);
+app.use('/api/class-fees', classFeeRoutes);
+app.use('/api/payments', paymentRoutes);
+
+app.use('/api/transport-fees', transportFeeRoutes);
 
 app.get("/", (req, res) => {
     res.send("Hello from Express on Vercel!");
