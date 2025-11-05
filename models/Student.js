@@ -14,6 +14,7 @@ const studentSchema = new mongoose.Schema({
   rollNo: { type: String, required: true }, // ✅ String as roll numbers may have leading zeros
   photo: { type: String }, // ✅ Cloudinary URL
   transport: { type: Boolean, default: false },
+  transportFee: { type: Number, default: null },
   admissionDate: { type: Date, default: Date.now }
 });
 

@@ -2,18 +2,20 @@
 
 import Student from '../models/Student.js';
 import cloudinary from '../config/cloudinary.js';
+import User from '../models/User.js';
 
 export const addStudent = async (req, res) => {
   try {
     const {
       name, fatherName, motherName, class: studentClass,
-      section, rollNo, mobile, address, aadhar, transport
+      section, rollNo, mobile, address, aadhar, transport, transportFee
     } = req.body;
 
     const studentData = {
       name, fatherName, motherName, class: studentClass,
       section, rollNo, mobile, address, aadhar,
-      transport: transport === 'true' || transport === true
+      transport: parseBoolean(transport),
+      transportFee: parseBoolean(transport) ? (Number(transportFee) || null) : null
     };
 
     if (req.file) {
@@ -43,7 +45,6 @@ export const addStudent = async (req, res) => {
 };
 
 
-
 // ... (baaki functions unchanged - getAllStudents, etc.)
 export const getAllStudents = async (req, res) => {
   try {
@@ -60,28 +61,45 @@ export const getAllStudents = async (req, res) => {
   }
 };
 
+
 export const getStudentsForTeacher = async (req, res) => {
   try {
-    // ✅ Safety check (though middleware should ensure req.user exists)
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const teacherClasses = req.user.assignedClasses || [];
-
-    // ✅ Return empty array instead of 403
-    if (teacherClasses.length === 0) {
-      return res.json([]); // ← 200 OK with empty list
+    // ✅ If user is admin, return all students
+    if (req.user.role === 'admin') {
+      const allStudents = await Student.find().sort({ class: 1, rollNo: 1 });
+      return res.json(allStudents);
     }
 
-    const students = await Student.find({ class: { $in: teacherClasses } });
+    // ✅ Find teacher by ID
+    const teacher = await User.findById(req.user.id);
+    if (!teacher) {
+      return res.status(404).json({ message: 'Teacher not found' });
+    }
+
+    // ✅ Extract assigned classes
+    const assignedClasses =
+      teacher.teachingAssignments?.map((a) => a.class).filter(Boolean) || [];
+
+    if (assignedClasses.length === 0) {
+      return res.json([]); // no classes
+    }
+
+    // ✅ Fetch only those students
+    const students = await Student.find({ class: { $in: assignedClasses } }).sort({
+      class: 1,
+      rollNo: 1,
+    });
+
     res.json(students);
   } catch (err) {
-    console.error('Error in getStudentsForTeacher:', err);
+    console.error('❌ Error in getStudentsForTeacher:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 
 
 export const getStudentCount = async (req, res) => {
@@ -136,9 +154,9 @@ const parseBoolean = (val) => {
 export const updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
+     const {
       name, fatherName, motherName, class: studentClass,
-      section, rollNo, mobile, address, aadhar, transport
+      section, rollNo, mobile, address, aadhar, transport, transportFee
     } = req.body;
 
     const existingStudent = await Student.findById(id);
@@ -167,20 +185,20 @@ export const updateStudent = async (req, res) => {
       }
     }
 
-    // ✅ Parse transport safely
-    const updatedData = {
-      name: name || '',
-      fatherName: fatherName || '',
-      motherName: motherName || '',
-      class: studentClass || '',
-      section: section || '',
-      rollNo: rollNo || '',
-      mobile: mobile || '',
-      address: address || '',
-      aadhar: aadhar || '',
-      transport: parseBoolean(transport), // 👈 FIXED
-      photo: photoUrl
-    };
+  const updatedData = {
+  name: name || '',
+  fatherName: fatherName || '',
+  motherName: motherName || '',
+  class: studentClass || '',
+  section: section || '',
+  rollNo: rollNo || '',
+  mobile: mobile || '',
+  address: address || '',
+  aadhar: aadhar || '',
+  transport: parseBoolean(transport),
+  transportFee: parseBoolean(transport) ? (Number(transportFee) || null) : null,
+  photo: photoUrl
+};
 
     const updatedStudent = await Student.findByIdAndUpdate(
       id,

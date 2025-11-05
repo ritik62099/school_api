@@ -137,16 +137,19 @@ const login = async (req, res) => {
   }
 };
 
-// @desc Get logged in user
-const getMe = async (req, res) => {
+// controllers/authController.js
+export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password -otp -otpExpires');
+    const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
+
+    // ✅ Flatten Maps
+    res.json(user.toObject({ flattenMaps: true }));
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
 };
 
+
 // ✅ ESM mein export
-export { requestOtp, signup, login, getMe };
+export { requestOtp, signup, login };

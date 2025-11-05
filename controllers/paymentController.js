@@ -1,232 +1,110 @@
-// src/controllers/paymentController.js
-import mongoose from 'mongoose';
+// controllers/paymentController.js
+import Payment from '../models/Payment.js';
 import Student from '../models/Student.js';
 import ClassFee from '../models/ClassFee.js';
-import TransportFee from '../models/TransportFee.js';
-import Payment from '../models/Payment.js';
+import dayjs from 'dayjs';
 
-export const getStudentDues = async (req, res) => {
+export const generateDemandBill = async (req, res) => {
   try {
-    const { studentId } = req.params;
-    const { months = 1 } = req.query;
-
-    const numMonths = parseInt(months, 10);
-    if (isNaN(numMonths) || numMonths < 1 || numMonths > 12) {
-      return res.status(400).json({ message: 'Months must be between 1 and 12' });
-    }
-
-    // Find student
-    const student = await Student.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ message: 'Student not found' });
-    }
-
-    // Fetch fees in parallel
-    const [classFeeDoc, transportFeeDoc] = await Promise.all([
-      ClassFee.findOne({ className: student.class }),
-      student.transport ? TransportFee.findOne({ className: student.class }) : null
-    ]);
-
-    const classFee = classFeeDoc?.monthlyFee || 0;
-    const transportFee = transportFeeDoc?.monthlyFee || 0;
-
-    const totalClass = classFee * numMonths;
-    const totalTransport = transportFee * numMonths;
-    const grandTotal = totalClass + totalTransport;
-
-    return res.json({
-      studentId: student._id,
-      name: student.name,
-      class: student.class,
-      transport: student.transport,
-      months: numMonths,
-      fees: {
-        class: {
-          monthly: classFee,
-          total: totalClass
-        },
-        transport: {
-          monthly: transportFee,
-          total: totalTransport
-        },
-        grandTotal
-      }
-    });
-  } catch (err) {
-    console.error('Error in getStudentDues:', err);
-    return res.status(500).json({ message: 'Failed to calculate student dues' });
-  }
-};
-
-
-
-// src/controllers/paymentController.js
-
-export const recordPayment = async (req, res) => {
-    try {
-        const { studentId, month, year, amountPaid = 0 } = req.body;
-
-        if (!studentId || !month || !year) {
-            return res.status(400).json({ message: 'Missing required fields' });
-        }
-
-        // Fetch student
-        const student = await Student.findById(studentId);
-        if (!student) {
-            return res.status(404).json({ message: 'Student not found' });
-        }
-
-        // 1. Get fees and baseDue
-        const classFeeDoc = await ClassFee.findOne({ className: student.class });
-        const transportFeeDoc = student.transport
-            ? await TransportFee.findOne({ className: student.class })
-            : null;
-
-        const classFee = classFeeDoc?.monthlyFee || 0;
-        const transportFee = transportFeeDoc?.monthlyFee || 0;
-        const baseDue = classFee + transportFee; 
-
-        // 2. Get carried balance (lastBalance)
-        const months = [
-            'January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'
-        ];
-        const targetMonthIndex = months.indexOf(month);
-        const targetDate = new Date(year, targetMonthIndex, 1);
-        
-        // Fetch all payments and sort them by date (Newest first)
-        const payments = await Payment.find({ studentId })
-            .sort({ year: -1, month: -1 }); // Newest first
-
-        // ✅ FIX: latestPreviousPayment must be defined with 'const'
-        const latestPreviousPayment = payments.find(p => { // <--- This line defines the variable
-            const pIndex = months.indexOf(p.month);
-            if (pIndex === -1) return false;
-            const pDate = new Date(p.year, pIndex, 1);
-            
-            // Find the latest payment that occurred BEFORE the current month.
-            return pDate < targetDate; 
-        });
-        
-        const lastBalance = latestPreviousPayment?.balanceAfter || 0; // <--- This line uses it
-
-        // 3. Calculate final amounts
-        const totalDue = baseDue + lastBalance;
-        const paid = parseFloat(amountPaid) || 0;
-        const balanceAfter = totalDue - paid;
-
-        // 4. Save/Update Payment Record
-        let payment = await Payment.findOne({ studentId, month, year });
-        const isNew = !payment;
-
-        if (isNew) {
-            payment = new Payment({
-                studentId,
-                month,
-                year,
-                classFee,
-                transportFee: student.transport ? transportFee : 0,
-                duesCarriedIn: lastBalance,
-                amountPaid: paid,
-                balanceAfter
-            });
-        } else {
-            payment.classFee = classFee;
-            payment.transportFee = student.transport ? transportFee : 0;
-            payment.duesCarriedIn = lastBalance;
-            payment.amountPaid = paid;
-            payment.balanceAfter = balanceAfter;
-        }
-
-        await payment.save();
-
-        res.status(200).json({
-            message: isNew ? 'Payment recorded successfully' : 'Payment updated successfully',
-            payment
-        });
-    } catch (err) {
-        console.error('Payment record error:', err);
-        res.status(500).json({ message: 'Failed to record payment' });
-    }
-};
-// In paymentController.js
-export const getDues = async (req, res) => {
-  try {
-    const { studentId } = req.params;
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
+    const { studentId, month, year } = req.body;
 
     const student = await Student.findById(studentId);
     if (!student) return res.status(404).json({ message: 'Student not found' });
 
-    // Get base fees
-    let classFee = 0, transportFee = 0;
-    if (student.class) {
-      const classFeeDoc = await ClassFee.findOne({ class: student.class });
-      classFee = classFeeDoc ? classFeeDoc.monthly : 0;
+    const classFeeDoc = await ClassFee.findOne({ className: student.class });
+    if (!classFeeDoc)
+      return res.status(404).json({ message: 'Class fee not found' });
+
+    const classFee = classFeeDoc.monthlyFee;
+    const transportFee = student.transport ? student.transportFee || 0 : 0;
+
+    // find unpaid months
+    const lastPayments = await Payment.find({ studentId })
+      .sort({ year: -1, month: -1 })
+      .limit(12);
+
+    const paidMonths = new Set(lastPayments.flatMap(p => p.monthsCovered));
+    const today = dayjs(`${year}-${month}-01`);
+
+    // check previous 6 months dues
+    let pendingMonths = [];
+    for (let i = 5; i >= 0; i--) {
+      const m = today.subtract(i + 1, 'month');
+      const label = `${m.format('MMMM')} ${m.year()}`;
+      if (!paidMonths.has(label)) {
+        pendingMonths.push(label);
+      }
     }
-    if (student.transport) {
-      const transportFeeDoc = await TransportFee.findOne({ class: student.class });
-      transportFee = transportFeeDoc ? transportFeeDoc.monthly : 0;
+
+    const currentMonthLabel = `${today.format('MMMM')} ${today.year()}`;
+    if (!paidMonths.has(currentMonthLabel)) {
+      pendingMonths.push(currentMonthLabel);
     }
-    const baseTotal = classFee + transportFee;
 
-    // Check carry-forward from LAST month
-    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-    const lastPayment = await Payment.findOne({ studentId, month: prevMonth, year: prevYear });
-    const carryForwardFromLast = lastPayment?.carryForward || 0;
+    const totalDue =
+      pendingMonths.length * (classFee + transportFee);
 
-    // Check ADVANCED payment from FUTURE months
-    const futurePayments = await Payment.find({
-      studentId,
-      $or: [
-        { year: { $gt: currentYear } },
-        { year: currentYear, month: { $gt: currentMonth } }
-      ]
-    });
-    const totalAdvanced = futurePayments.reduce((sum, p) => sum + (p.paidNow || 0), 0);
+    const demandBill = {
+      student,
+      classFee,
+      transportFee,
+      pendingMonths,
+      totalPayable: totalDue,
+      type: 'demand',
+    };
 
-    // Final dues = base + carryForward - advanced
-    let grandTotal = baseTotal + carryForwardFromLast - totalAdvanced;
-    if (grandTotal < 0) grandTotal = 0; // Can't be negative
-
-    res.json({
-      name: student.name,
-      class: student.class,
-      section: student.section,
-      transport: student.transport,
-      fees: {
-        class: { monthly: classFee },
-        transport: { monthly: transportFee },
-        grandTotal,
-        baseTotal,
-        carryForwardFromLast,
-        totalAdvanced
-      },
-      nextMonthExpected: baseTotal // next month base fee (without carry/advanced)
-    });
+    res.json(demandBill);
   } catch (err) {
-    console.error('Dues error:', err);
-    res.status(500).json({ message: 'Failed to calculate dues' });
+    console.error(err);
+    res.status(500).json({ message: 'Failed to generate demand bill' });
   }
 };
-// controllers/paymentController.js
 
-export const getPaymentHistory = async (req, res) => {
+export const recordPayment = async (req, res) => {
   try {
-    const { studentId } = req.params;
-    const { limit = 6 } = req.query;
+    const { studentId, monthsToPay, startMonth, startYear, amountPaid } = req.body;
 
-    const history = await Payment.find({ studentId })
-      .sort({ year: 1, month: 1 }) // ✅ Oldest first
-      .limit(parseInt(limit))
-      .lean();
+    const student = await Student.findById(studentId);
+    if (!student) return res.status(404).json({ message: 'Student not found' });
 
-    res.json(history);
+    const classFeeDoc = await ClassFee.findOne({ className: student.class });
+    if (!classFeeDoc)
+      return res.status(404).json({ message: 'Class fee not found' });
+
+    const classFee = classFeeDoc.monthlyFee;
+    const transportFee = student.transport ? student.transportFee || 0 : 0;
+    const monthList = [];
+    let totalAmount = 0;
+
+    for (let i = 0; i < monthsToPay; i++) {
+      const m = dayjs(`${startYear}-${startMonth}-01`).add(i, 'month');
+      const label = `${m.format('MMMM')} ${m.year()}`;
+      monthList.push(label);
+      totalAmount += classFee + transportFee;
+    }
+
+    const dueAmount = totalAmount - amountPaid;
+
+    const payment = new Payment({
+      studentId,
+      studentName: student.name,
+      className: student.class,
+      section: student.section,
+      month: startMonth,
+      year: startYear,
+      classFee,
+      transportFee,
+      totalAmount,
+      amountPaid,
+      dueAmount,
+      paymentType: 'payment',
+      monthsCovered: monthList,
+    });
+
+    await payment.save();
+    res.status(201).json(payment);
   } catch (err) {
-    console.error('Payment history error:', err);
-    res.status(500).json({ message: 'Failed to load payment history' });
+    console.error(err);
+    res.status(500).json({ message: 'Failed to record payment' });
   }
 };

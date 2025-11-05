@@ -1,44 +1,44 @@
-// server/seeds/adminSeed.js
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
-import User from './models/User.js';
-import dotenv from 'dotenv';
+// // server/seeds/adminSeed.js
+// import mongoose from 'mongoose';
+// import bcrypt from 'bcryptjs';
+// import User from './models/User.js';
+// import dotenv from 'dotenv';
 
-dotenv.config();
-const createAdmin = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
+// dotenv.config();
+// const createAdmin = async () => {
+//   try {
+//     await mongoose.connect(process.env.MONGO_URI);
 
-    // Check if admin already exists
-    const existingAdmin = await User.findOne({ email: 'admin@school.com', role: 'admin' });
-    if (existingAdmin) {
-      console.log('✅ Admin already exists');
-      process.exit(0);
-    }
+//     // Check if admin already exists
+//     const existingAdmin = await User.findOne({ email: 'admin@school.com', role: 'admin' });
+//     if (existingAdmin) {
+//       console.log('✅ Admin already exists');
+//       process.exit(0);
+//     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash('admin123', salt);
+//     // Hash password
+//     const salt = await bcrypt.genSalt(10);
+//     const hashedPassword = await bcrypt.hash('admin123', salt);
 
-    // Create admin
-    const admin = new User({
-      name: 'School Admin',
-      email: 'admin@school.com',
-      password: hashedPassword,
-      role: 'admin', // ← important
-      isOtpOnly: false
-    });
+//     // Create admin
+//     const admin = new User({
+//       name: 'School Admin',
+//       email: 'admin@school.com',
+//       password: hashedPassword,
+//       role: 'admin', // ← important
+//       isOtpOnly: false
+//     });
 
-    await admin.save();
-    console.log('✅ Admin created: admin@school.com / admin123');
-    process.exit(0);
-  } catch (err) {
-    console.error('❌ Admin creation failed:', err);
-    process.exit(1);
-  }
-};
+//     await admin.save();
+//     console.log('✅ Admin created: admin@school.com / admin123');
+//     process.exit(0);
+//   } catch (err) {
+//     console.error('❌ Admin creation failed:', err);
+//     process.exit(1);
+//   }
+// };
 
-createAdmin();
+// createAdmin();
 
 // // seedExams.js
 // import mongoose from 'mongoose';
@@ -124,3 +124,70 @@ createAdmin();
 // };
 
 // run();
+
+// scripts/migrate-teachers.js
+import dotenv from 'dotenv';
+import mongoose from 'mongoose';
+import User from './models/User.js';
+
+dotenv.config();
+
+const migrate = async () => {
+  if (!process.env.MONGO_URI) {
+    console.error('❌ MONGO_URI not found in environment variables!');
+    process.exit(1);
+  }
+
+  await mongoose.connect(process.env.MONGO_URI);
+  console.log('✅ Connected to MongoDB');
+
+  // ✅ SAFER QUERY: Only teachers where assignedClasses is a non-empty array
+  const teachers = await User.find({
+    role: 'teacher',
+    assignedClasses: {
+      $exists: true,
+      $type: 'array',    // ← ensure it's an array
+      $ne: null,         // ← not null
+      $not: { $size: 0 } // ← not empty
+    }
+  });
+
+  console.log(`Found ${teachers.length} teachers to migrate...`);
+
+  for (const teacher of teachers) {
+    // ✅ Extra safety
+    const classes = Array.isArray(teacher.assignedClasses)
+      ? teacher.assignedClasses
+      : [];
+
+    if (classes.length === 0) {
+      console.log(`⚠️ Skipping ${teacher.name}: no valid classes`);
+      continue;
+    }
+
+    const assignments = classes.map(cls => ({
+      class: cls,
+      subjects: Array.isArray(teacher.assignedSubjects) ? teacher.assignedSubjects : [],
+      canMarkAttendance: !!teacher.canMarkAttendance
+    }));
+
+    await User.findByIdAndUpdate(teacher._id, {
+      teachingAssignments: assignments,
+      $unset: {
+        assignedClasses: "",
+        assignedSubjects: "",
+        canMarkAttendance: ""
+      }
+    });
+    console.log(`✅ Migrated: ${teacher.name} (${teacher.email})`);
+  }
+
+  console.log('🎉 Migration complete!');
+  await mongoose.connection.close();
+  process.exit(0);
+};
+
+migrate().catch(err => {
+  console.error('❌ Migration failed:', err);
+  process.exit(1);
+});

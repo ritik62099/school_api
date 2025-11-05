@@ -64,17 +64,23 @@ export const getAttendanceByDateAndClass = async (req, res) => {
       return res.status(400).json({ message: 'Date and class are required' });
     }
 
-    // ✅ Same normalization as in markAttendance
     const queryDate = new Date(date);
-    queryDate.setHours(0, 0, 0, 0); // ← Yeh line add karo
+    queryDate.setHours(0, 0, 0, 0);
 
+    // ✅ Find OR default to empty structure
     const attendance = await Attendance.findOne({
       date: queryDate,
       class: className
     });
 
     if (!attendance) {
-      return res.status(404).json({ message: 'No attendance found' });
+      // ✅ Return 200 with empty records instead of 404
+      return res.json({
+        date: queryDate,
+        class: className,
+        records: [],
+        markedBy: null
+      });
     }
 
     res.json(attendance);
@@ -89,57 +95,57 @@ const getDaysInMonth = (year, month) => {
   return new Date(year, month, 0).getDate(); // month = 1-12
 };
 
-export const getMonthlyAttendanceReport = async (req, res) => {
-  try {
-    const { class: className, year, month } = req.query;
+// export const getMonthlyAttendanceReport = async (req, res) => {
+//   try {
+//     const { class: className, year, month } = req.query;
 
-    if (!className || !year || !month) {
-      return res.status(400).json({ message: 'Class, year, and month are required' });
-    }
+//     if (!className || !year || !month) {
+//       return res.status(400).json({ message: 'Class, year, and month are required' });
+//     }
 
-    const yearNum = parseInt(year);
-    const monthNum = parseInt(month); // 1 = January, 10 = October
+//     const yearNum = parseInt(year);
+//     const monthNum = parseInt(month); // 1 = January, 10 = October
 
-    if (monthNum < 1 || monthNum > 12) {
-      return res.status(400).json({ message: 'Invalid month' });
-    }
+//     if (monthNum < 1 || monthNum > 12) {
+//       return res.status(400).json({ message: 'Invalid month' });
+//     }
 
-    // Total students in this class
-    const totalStudents = await Student.countDocuments({ class: className });
-    if (totalStudents === 0) {
-      return res.status(404).json({ message: 'No students found in this class' });
-    }
+//     // Total students in this class
+//     const totalStudents = await Student.countDocuments({ class: className });
+//     if (totalStudents === 0) {
+//       return res.status(404).json({ message: 'No students found in this class' });
+//     }
 
-    const daysInMonth = getDaysInMonth(yearNum, monthNum);
-    const report = [];
+//     const daysInMonth = getDaysInMonth(yearNum, monthNum);
+//     const report = [];
 
-    // Har din ke liye attendance check karein
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dateObj = new Date(dateStr);
-      dateObj.setHours(0, 0, 0, 0);
+//     // Har din ke liye attendance check karein
+//     for (let day = 1; day <= daysInMonth; day++) {
+//       const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+//       const dateObj = new Date(dateStr);
+//       dateObj.setHours(0, 0, 0, 0);
 
-      const attendance = await Attendance.findOne({ date: dateObj, class: className });
+//       const attendance = await Attendance.findOne({ date: dateObj, class: className });
 
-      const presentCount = attendance ? attendance.records.filter(r => r.present).length : 0;
-      const absentCount = totalStudents - presentCount;
+//       const presentCount = attendance ? attendance.records.filter(r => r.present).length : 0;
+//       const absentCount = totalStudents - presentCount;
 
-      // Sirf school days (Mon-Fri) include karein? Agar chahiye toh add karein
-      report.push({
-        date: dateStr,
-        totalStudents,
-        present: presentCount,
-        absent: absentCount,
-        marked: !!attendance
-      });
-    }
+//       // Sirf school days (Mon-Fri) include karein? Agar chahiye toh add karein
+//       report.push({
+//         date: dateStr,
+//         totalStudents,
+//         present: presentCount,
+//         absent: absentCount,
+//         marked: !!attendance
+//       });
+//     }
 
-    res.json({ report, className, year: yearNum, month: monthNum });
-  } catch (err) {
-    console.error('Monthly Report Error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+//     res.json({ report, className, year: yearNum, month: monthNum });
+//   } catch (err) {
+//     console.error('Monthly Report Error:', err);
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// };
 
 export const getStudentMonthlyAttendance = async (req, res) => {
   try {
@@ -224,6 +230,64 @@ export const getStudentTotalAttendance = async (req, res) => {
     });
   } catch (err) {
     console.error('Total Attendance Error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const getMonthlyAttendanceReport = async (req, res) => {
+  try {
+    const { class: className, year, month } = req.query;
+
+    if (!className || !year || !month) {
+      return res.status(400).json({ message: 'Class, year, and month are required' });
+    }
+
+    // ✅ Permission check for teachers
+    if (req.user.role === 'teacher') {
+      const assignedClasses = (req.user.teachingAssignments || []).map(a => a.class);
+      if (!assignedClasses.includes(className)) {
+        return res.status(403).json({
+          message: `You are not authorized to view attendance for class ${className}`
+        });
+      }
+    }
+
+    const yearNum = parseInt(year);
+    const monthNum = parseInt(month);
+
+    if (monthNum < 1 || monthNum > 12) {
+      return res.status(400).json({ message: 'Invalid month' });
+    }
+
+    const totalStudents = await Student.countDocuments({ class: className });
+    if (totalStudents === 0) {
+      return res.status(404).json({ message: 'No students found in this class' });
+    }
+
+    const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+    const report = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dateObj = new Date(dateStr);
+      dateObj.setHours(0, 0, 0, 0);
+
+      const attendance = await Attendance.findOne({ date: dateObj, class: className });
+      const presentCount = attendance ? attendance.records.filter(r => r.present).length : 0;
+      const absentCount = totalStudents - presentCount;
+
+      report.push({
+        date: dateStr,
+        totalStudents,
+        present: presentCount,
+        absent: absentCount,
+        marked: !!attendance
+      });
+    }
+
+    res.json({ report, className, year: yearNum, month: monthNum });
+  } catch (err) {
+    console.error('Monthly Report Error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };

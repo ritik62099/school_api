@@ -1,9 +1,8 @@
-// controllers/teacherController.js
-import User from '../models/User.js'; // ✅ Use User model
+
+import User from '../models/User.js';
 
 export const getAllTeachers = async (req, res) => {
   try {
-    // ✅ Only get users with role = 'teacher'
     const teachers = await User.find({ role: 'teacher' });
     res.json(teachers);
   } catch (err) {
@@ -34,19 +33,32 @@ export const approveTeacher = async (req, res) => {
   }
 };
 
-// Update assignClassSubject function
+// ✅ NEW: Assign per-class subjects + attendance
 export const assignClassSubject = async (req, res) => {
   try {
-    const { assignedClasses, assignedSubjects } = req.body;
-    
-    // ✅ Validate arrays
-    if (!Array.isArray(assignedClasses) || !Array.isArray(assignedSubjects)) {
-      return res.status(400).json({ message: 'Classes and subjects must be arrays' });
+    const { teachingAssignments } = req.body;
+    const { id } = req.params;
+
+    // Validation
+    if (!Array.isArray(teachingAssignments)) {
+      return res.status(400).json({ message: 'teachingAssignments must be an array' });
+    }
+
+    for (const item of teachingAssignments) {
+      if (!item.class) {
+        return res.status(400).json({ message: 'Each assignment must include "class"' });
+      }
+      if (!Array.isArray(item.subjects)) {
+        return res.status(400).json({ message: '"subjects" must be an array' });
+      }
+      if (typeof item.canMarkAttendance !== 'boolean') {
+        return res.status(400).json({ message: '"canMarkAttendance" must be a boolean' });
+      }
     }
 
     const teacher = await User.findByIdAndUpdate(
-      req.params.id,
-      { assignedClasses, assignedSubjects },
+      id,
+      { teachingAssignments },
       { new: true }
     );
 
@@ -54,37 +66,14 @@ export const assignClassSubject = async (req, res) => {
       return res.status(404).json({ message: 'Teacher not found' });
     }
 
-    res.json({ message: 'Assignment updated', teacher });
+    res.json({ message: 'Assignment updated successfully', teacher });
   } catch (err) {
     console.error('Assignment error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-// Add this function
-export const updateAttendanceAccess = async (req, res) => {
-  try {
-    const { canMarkAttendance } = req.body;
-    
-    if (typeof canMarkAttendance !== 'boolean') {
-      return res.status(400).json({ message: 'canMarkAttendance must be boolean' });
-    }
-
-    const teacher = await User.findByIdAndUpdate(
-      req.params.id,
-      { canMarkAttendance },
-      { new: true }
-    );
-
-    if (!teacher) {
-      return res.status(404).json({ message: 'Teacher not found' });
-    }
-
-    res.json({ message: 'Attendance access updated', teacher });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+// ❌ REMOVE: updateAttendanceAccess (ab per-class hai, global nahi)
 
 export const deleteTeacher = async (req, res) => {
   try {

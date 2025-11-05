@@ -1,5 +1,50 @@
 
 
+// // models/Mark.js
+// import mongoose from "mongoose";
+
+// const marksSchema = new mongoose.Schema({
+//   studentId: { 
+//     type: mongoose.Schema.Types.ObjectId, 
+//     ref: "Student", 
+//     required: true 
+//   },
+//   class: { type: String, required: true },
+//   exams: {
+//     pa1: { type: Map, of: Number, default: {} },
+//     pa2: { type: Map, of: Number, default: {} },
+//     halfYear: { type: Map, of: Number, default: {} },
+//     pa3: { type: Map, of: Number, default: {} },
+//     pa4: { type: Map, of: Number, default: {} },
+//     final: { type: Map, of: Number, default: {} },
+//   },
+//   // 🔽 Keep existing fields
+//   total: { type: Number, default: 0 },        // raw total (optional)
+//   percentage: { type: Number, default: 0 },   // raw percentage (optional)
+
+//   // ✅ ADD NEW FIELDS FOR WEIGHTED SCHEME
+//   weightedTotal: { 
+//     type: Number, 
+//     default: 0,
+//     min: 0,
+//     max: 100 
+//   },
+//   weightedDetails: {
+//     type: Map,
+//     of: {
+//       term1: Number,
+//       term2: Number,
+//       total: Number
+//     },
+//     default: {}
+//   }
+// }, {
+//   timestamps: true
+// });
+
+// export default mongoose.model("Marks", marksSchema);
+
+
 // models/Mark.js
 import mongoose from "mongoose";
 
@@ -11,18 +56,15 @@ const marksSchema = new mongoose.Schema({
   },
   class: { type: String, required: true },
   exams: {
-    pa1: { type: Map, of: Number, default: {} },
-    pa2: { type: Map, of: Number, default: {} },
-    halfYear: { type: Map, of: Number, default: {} },
-    pa3: { type: Map, of: Number, default: {} },
-    pa4: { type: Map, of: Number, default: {} },
-    final: { type: Map, of: Number, default: {} },
+    pa1: { type: mongoose.Schema.Types.Mixed, default: {} },
+    pa2: { type: mongoose.Schema.Types.Mixed, default: {} },
+    halfYear: { type: mongoose.Schema.Types.Mixed, default: {} },
+    pa3: { type: mongoose.Schema.Types.Mixed, default: {} },
+    pa4: { type: mongoose.Schema.Types.Mixed, default: {} },
+    final: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
-  // 🔽 Keep existing fields
-  total: { type: Number, default: 0 },        // raw total (optional)
-  percentage: { type: Number, default: 0 },   // raw percentage (optional)
-
-  // ✅ ADD NEW FIELDS FOR WEIGHTED SCHEME
+  total: { type: Number, default: 0 },
+  percentage: { type: Number, default: 0 },
   weightedTotal: { 
     type: Number, 
     default: 0,
@@ -30,16 +72,13 @@ const marksSchema = new mongoose.Schema({
     max: 100 
   },
   weightedDetails: {
-    type: Map,
-    of: {
-      term1: Number,
-      term2: Number,
-      total: Number
-    },
+    type: mongoose.Schema.Types.Mixed,
     default: {}
   }
 }, {
   timestamps: true
 });
+
+marksSchema.index({ studentId: 1 }, { unique: true });
 
 export default mongoose.model("Marks", marksSchema);

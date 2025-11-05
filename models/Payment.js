@@ -2,27 +2,32 @@
 import mongoose from 'mongoose';
 
 const paymentSchema = new mongoose.Schema({
-  studentId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Student', 
-    required: true 
+  studentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Student',
+    required: true
   },
-  month: { 
-    type: String, 
-    required: true,
-    enum: [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ]
+  studentName: String,
+  className: String,
+  section: String,
+  month: Number, // e.g. 11 for November
+  year: Number,  // e.g. 2025
+  classFee: Number,
+  transportFee: Number,
+  totalAmount: Number,
+  amountPaid: Number,
+  dueAmount: Number,
+  paymentDate: {
+    type: Date,
+    default: Date.now
   },
-  year: { type: Number, required: true },
-  classFee: { type: Number, default: 0 },
-  transportFee: { type: Number, default: 0 },
-  duesCarriedIn: { type: Number, default: 0 }, // balance from previous month
-  amountPaid: { type: Number, default: 0 },
-  balanceAfter: { type: Number, default: 0 } // can be negative (advance) or positive (dues)
-}, {
-  timestamps: true
+  paymentType: {
+    type: String,
+    enum: ['demand', 'payment'], // demand bill or payment receipt
+    default: 'payment'
+  },
+  monthsCovered: [String], // e.g. ["September 2025", "October 2025"]
+  remarks: String
 });
 
 export default mongoose.model('Payment', paymentSchema);

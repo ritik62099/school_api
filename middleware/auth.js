@@ -17,7 +17,8 @@ export const auth = async (req, res, next) => {
       role: user.role,
       assignedClasses: user.assignedClasses || [],
       assignedSubjects: user.assignedSubjects || [],
-      canMarkAttendance: user.canMarkAttendance || false
+      teachingAssignments: user.teachingAssignments || [],
+       canMarkAttendance: (user.teachingAssignments || []).some(a => a.canMarkAttendance === true)
     };
 
     next();
