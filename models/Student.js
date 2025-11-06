@@ -6,9 +6,9 @@ const studentSchema = new mongoose.Schema({
   name: { type: String, required: true },
   fatherName: { type: String, required: true },
   motherName: { type: String },
-  mobile: { type: String, required: true },
+  mobile: { type: String },
   address: { type: String, required: true },
-  aadhar: { type: String, unique: true },
+  aadhar: { type: String },
   class: { type: String, required: true },
   section: { type: String, enum: ["A", "B", "C"], required: true },
   rollNo: { type: String, required: true }, // ✅ String as roll numbers may have leading zeros
