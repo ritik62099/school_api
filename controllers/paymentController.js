@@ -3,44 +3,7 @@ import Payment from "../models/Payment.js";
 import ClassFee from "../models/ClassFee.js";
 import Student from "../models/Student.js";
 
-/**
- * ✅ Create Monthly Payment Record
- * POST /api/payments
- */
-// export const createPayment = async (req, res) => {
-//   try {
-//     const { studentId, className, month, year, tuitionFee, transportFee, total, date } = req.body;
 
-//     if (!studentId || !month || !year) {
-//       return res.status(400).json({ message: "Missing required fields." });
-//     }
-
-//     // Prevent duplicate month payment
-//     const existing = await Payment.findOne({ studentId, month, year });
-//     if (existing) {
-//       return res.status(400).json({ message: "Payment already exists for this month." });
-//     }
-
-//     const student = await Student.findById(studentId);
-//     if (!student) return res.status(404).json({ message: "Student not found." });
-
-//     const payment = await Payment.create({
-//       studentId,
-//       className,
-//       month,
-//       year,
-//       tuitionFee,
-//       transportFee,
-//       total,
-//       date: date || new Date(),
-//     });
-
-//     res.status(201).json(payment);
-//   } catch (err) {
-//     console.error("Payment create error:", err);
-//     res.status(500).json({ message: "Server error while creating payment." });
-//   }
-// };
 
 /**
  * ✅ Get Payment History of a Student

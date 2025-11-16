@@ -95,57 +95,6 @@ const getDaysInMonth = (year, month) => {
   return new Date(year, month, 0).getDate(); // month = 1-12
 };
 
-// export const getMonthlyAttendanceReport = async (req, res) => {
-//   try {
-//     const { class: className, year, month } = req.query;
-
-//     if (!className || !year || !month) {
-//       return res.status(400).json({ message: 'Class, year, and month are required' });
-//     }
-
-//     const yearNum = parseInt(year);
-//     const monthNum = parseInt(month); // 1 = January, 10 = October
-
-//     if (monthNum < 1 || monthNum > 12) {
-//       return res.status(400).json({ message: 'Invalid month' });
-//     }
-
-//     // Total students in this class
-//     const totalStudents = await Student.countDocuments({ class: className });
-//     if (totalStudents === 0) {
-//       return res.status(404).json({ message: 'No students found in this class' });
-//     }
-
-//     const daysInMonth = getDaysInMonth(yearNum, monthNum);
-//     const report = [];
-
-//     // Har din ke liye attendance check karein
-//     for (let day = 1; day <= daysInMonth; day++) {
-//       const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-//       const dateObj = new Date(dateStr);
-//       dateObj.setHours(0, 0, 0, 0);
-
-//       const attendance = await Attendance.findOne({ date: dateObj, class: className });
-
-//       const presentCount = attendance ? attendance.records.filter(r => r.present).length : 0;
-//       const absentCount = totalStudents - presentCount;
-
-//       // Sirf school days (Mon-Fri) include karein? Agar chahiye toh add karein
-//       report.push({
-//         date: dateStr,
-//         totalStudents,
-//         present: presentCount,
-//         absent: absentCount,
-//         marked: !!attendance
-//       });
-//     }
-
-//     res.json({ report, className, year: yearNum, month: monthNum });
-//   } catch (err) {
-//     console.error('Monthly Report Error:', err);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// };
 
 export const getStudentMonthlyAttendance = async (req, res) => {
   try {

@@ -6,7 +6,6 @@ import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import { generateOtp, sendOtpEmail } from '../utils/sendOtp.js'; // .js add karein
 
-// @desc    Request OTP for signup
 // @route   POST /api/auth/request-otp
 const requestOtp = async (req, res) => {
   const { email } = req.body;
