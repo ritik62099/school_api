@@ -11,7 +11,7 @@ import marksRoutes from "./routes/markRoutes.js";
 import classSubjectRoutes from './routes/classSubjectRoutes.js';
 import classFeeRoutes from './routes/classFeeRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
-
+import settingsRoutes from "./routes/settingsRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -48,7 +48,7 @@ app.use("/api/marks", marksRoutes);
 app.use('/api', classSubjectRoutes);
 app.use('/api/class-fees', classFeeRoutes);
 app.use('/api/payments', paymentRoutes);
-
+app.use("/api/settings", settingsRoutes);
 
 
 app.get("/", (req, res) => {
