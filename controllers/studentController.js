@@ -8,14 +8,16 @@ export const addStudent = async (req, res) => {
   try {
     const {
       name, fatherName, motherName, class: studentClass,
-      section, rollNo, mobile, address, aadhar, transport, transportFee
+      section, rollNo, mobile, address, aadhar, transport, transportFee, dob
     } = req.body;
+
 
     const studentData = {
       name, fatherName, motherName, class: studentClass,
       section, rollNo, mobile, address, aadhar,
       transport: parseBoolean(transport),
-      transportFee: parseBoolean(transport) ? (Number(transportFee) || null) : null
+      transportFee: parseBoolean(transport) ? (Number(transportFee) || null) : null,
+      dob: dob ? new Date(dob) : null,
     };
 
     if (req.file) {
@@ -154,9 +156,9 @@ const parseBoolean = (val) => {
 export const updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
-     const {
+    const {
       name, fatherName, motherName, class: studentClass,
-      section, rollNo, mobile, address, aadhar, transport, transportFee
+      section, rollNo, mobile, address, aadhar, transport, transportFee, dob
     } = req.body;
 
     const existingStudent = await Student.findById(id);
@@ -185,20 +187,21 @@ export const updateStudent = async (req, res) => {
       }
     }
 
-  const updatedData = {
-  name: name || '',
-  fatherName: fatherName || '',
-  motherName: motherName || '',
-  class: studentClass || '',
-  section: section || '',
-  rollNo: rollNo || '',
-  mobile: mobile || '',
-  address: address || '',
-  aadhar: aadhar || '',
-  transport: parseBoolean(transport),
-  transportFee: parseBoolean(transport) ? (Number(transportFee) || null) : null,
-  photo: photoUrl
-};
+    const updatedData = {
+      name: name || '',
+      fatherName: fatherName || '',
+      motherName: motherName || '',
+      class: studentClass || '',
+      section: section || '',
+      rollNo: rollNo || '',
+      mobile: mobile || '',
+      address: address || '',
+      aadhar: aadhar || '',
+      dob: dob ? new Date(dob) : existingStudent.dob, 
+      transport: parseBoolean(transport),
+      transportFee: parseBoolean(transport) ? (Number(transportFee) || null) : null,
+      photo: photoUrl
+    };
 
     const updatedStudent = await Student.findByIdAndUpdate(
       id,

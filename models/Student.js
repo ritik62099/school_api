@@ -15,6 +15,7 @@ const studentSchema = new mongoose.Schema({
   photo: { type: String }, // ✅ Cloudinary URL
   transport: { type: Boolean, default: false },
   transportFee: { type: Number, default: null },
+  dob: { type: Date, required: true },
   admissionDate: { type: Date, default: Date.now }
 });
 
