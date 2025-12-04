@@ -131,7 +131,7 @@ export const addMarks = async (req, res) => {
           if (exams[examKey] && exams[examKey][sub] !== undefined) {
             mergedExams[examKey][sub] = sanitizedExams[examKey][sub];
           }
-          // warna purana hi rehne do
+          
         });
       });
 
