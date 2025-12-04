@@ -48,6 +48,7 @@ const calculateWeightedTotal = (exams = {}, subjects = []) => {
   };
 };
 
+
 export const addMarks = async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -58,17 +59,19 @@ export const addMarks = async (req, res) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
+    // 🔐 Teacher authorization
     if (req.user.role === "teacher") {
-  const assignedClasses = (req.user.teachingAssignments || []).map(a => a.class);
-  if (!assignedClasses.includes(student.class)) {
-    return res.status(403).json({ message: "You are not authorized to enter marks for this class" });
-  }
-}
+      const assignedClasses = (req.user.teachingAssignments || []).map(a => a.class);
+      if (!assignedClasses.includes(student.class)) {
+        return res.status(403).json({ message: "You are not authorized to enter marks for this class" });
+      }
+    }
 
-
+    // 🎯 Subjects for this class
     const mappingDoc = await ClassSubjectMapping.getOrCreate();
     const subjects = mappingDoc.mapping[student.class] || [];
 
+    // 🧴 Sanitize incoming exams (sirf is request ke liye)
     const sanitizedExams = {
       pa1: {}, pa2: {}, pa3: {}, pa4: {},
       halfYear: {}, final: {}
@@ -88,22 +91,56 @@ export const addMarks = async (req, res) => {
       });
     });
 
-    const { total: weightedTotal, details: weightedDetails } = 
-      calculateWeightedTotal(sanitizedExams, subjects);
-
     let marksDoc = await Marks.findOne({ studentId });
 
+    let finalExams;
+
     if (!marksDoc) {
+      // 🆕 Pehli baar marks bana rahe hain → jo aaya sab laga do
+      finalExams = sanitizedExams;
+
+      const { total: weightedTotal, details: weightedDetails } =
+        calculateWeightedTotal(finalExams, subjects);
+
       marksDoc = new Marks({
         studentId,
         class: student.class,
-        exams: sanitizedExams,
+        exams: finalExams,
         weightedTotal,
         weightedDetails
       });
     } else {
-      // ✅ Direct object assignment (no Maps)
-      marksDoc.exams = sanitizedExams;
+      // 🔁 Yahan CHANGE hai – ab merge karenge, overwrite nahi
+
+      const existing = marksDoc.exams || {};
+
+      // Ensure structure hai
+      const mergedExams = {
+        pa1: existing.pa1 || {},
+        pa2: existing.pa2 || {},
+        pa3: existing.pa3 || {},
+        pa4: existing.pa4 || {},
+        halfYear: existing.halfYear || {},
+        final: existing.final || {}
+      };
+
+      // Sirf wahi subject update karo jo frontend ne bheja
+      Object.keys(sanitizedExams).forEach(examKey => {
+        subjects.forEach(sub => {
+          // Agar is request me ye subject aaya hai to hi update karo
+          if (exams[examKey] && exams[examKey][sub] !== undefined) {
+            mergedExams[examKey][sub] = sanitizedExams[examKey][sub];
+          }
+          // warna purana hi rehne do
+        });
+      });
+
+      finalExams = mergedExams;
+
+      const { total: weightedTotal, details: weightedDetails } =
+        calculateWeightedTotal(finalExams, subjects);
+
+      marksDoc.exams = finalExams;
       marksDoc.weightedTotal = weightedTotal;
       marksDoc.weightedDetails = weightedDetails;
     }
@@ -119,6 +156,7 @@ export const addMarks = async (req, res) => {
     res.status(500).json({ message: "Server error while saving marks" });
   }
 };
+
 
 // 👁️ Get marks by student (simplified)
 export const getMarksByStudent = async (req, res) => {
