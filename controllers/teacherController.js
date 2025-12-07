@@ -1,9 +1,13 @@
 
+
+// controllers/teacherController.js
 import User from '../models/User.js';
+import bcrypt from 'bcryptjs';
 
 export const getAllTeachers = async (req, res) => {
   try {
-    const teachers = await User.find({ role: 'teacher' });
+    // ❗ password ko kabhi front-end pe mat bhejo
+    const teachers = await User.find({ role: 'teacher' }).select('-password');
     res.json(teachers);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -25,7 +29,7 @@ export const approveTeacher = async (req, res) => {
       req.params.id,
       { isApproved: true },
       { new: true }
-    );
+    ).select('-password');
     if (!teacher) return res.status(404).json({ message: 'Teacher not found' });
     res.json(teacher);
   } catch (err) {
@@ -33,13 +37,39 @@ export const approveTeacher = async (req, res) => {
   }
 };
 
-// ✅ NEW: Assign per-class subjects + attendance
+// ✅ NEW: Reset / change password (admin)
+export const resetTeacherPassword = async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashed = await bcrypt.hash(newPassword, salt);
+
+    const teacher = await User.findByIdAndUpdate(
+      req.params.id,
+      { password: hashed },
+      { new: true }
+    ).select('-password');
+
+    if (!teacher) {
+      return res.status(404).json({ message: 'Teacher not found' });
+    }
+
+    res.json({ message: 'Password reset successfully', teacher });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 export const assignClassSubject = async (req, res) => {
   try {
     const { teachingAssignments } = req.body;
     const { id } = req.params;
 
-    // Validation
     if (!Array.isArray(teachingAssignments)) {
       return res.status(400).json({ message: 'teachingAssignments must be an array' });
     }
@@ -60,7 +90,7 @@ export const assignClassSubject = async (req, res) => {
       id,
       { teachingAssignments },
       { new: true }
-    );
+    ).select('-password');
 
     if (!teacher) {
       return res.status(404).json({ message: 'Teacher not found' });
@@ -72,8 +102,6 @@ export const assignClassSubject = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
-// ❌ REMOVE: updateAttendanceAccess (ab per-class hai, global nahi)
 
 export const deleteTeacher = async (req, res) => {
   try {

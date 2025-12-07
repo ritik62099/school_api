@@ -1,29 +1,8 @@
 
-// // models/User.js
-// import mongoose from 'mongoose';
 
-// const userSchema = new mongoose.Schema({
-//   name: { type: String, required: true },
-//   email: { type: String, required: true, unique: true },
-//   password: { type: String, required: true },
-//   // Remove: otp, otpExpires, isOtpOnly
-//   subject: { type: String },
-//   role: { 
-//     type: String, 
-//     enum: ['teacher', 'admin'], 
-//     default: 'teacher' 
-//   },
-//   isApproved: { type: Boolean, default: false },
-//   assignedClasses: [{ type: String }],
-//   assignedSubjects: [{ type: String }],
-//   canMarkAttendance: { type: Boolean, default: false }
-// }, { timestamps: true });
-
-// export default mongoose.model('schoolteacher', userSchema);
 // models/User.js
-
-
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -35,8 +14,7 @@ const userSchema = new mongoose.Schema({
     default: 'teacher' 
   },
   isApproved: { type: Boolean, default: false },
-  
-  // ✅ REPLACE old fields with new per-class structure
+
   teachingAssignments: [
     {
       class: { type: String, required: true },
@@ -44,9 +22,15 @@ const userSchema = new mongoose.Schema({
       canMarkAttendance: { type: Boolean, default: false }
     }
   ]
-  
-  // ❌ Remove these old fields:
-  // assignedClasses, assignedSubjects, canMarkAttendance (global)
 }, { timestamps: true });
 
+// Password hash karne ka hook
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+// findByIdAndUpdate use karte waqt alag se hash karna padega (neeche controller me)
 export default mongoose.model('schoolteacher', userSchema);
