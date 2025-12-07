@@ -1,38 +1,3 @@
-// import Settings from "../models/Settings.js";
-
-// export const saveExamDates = async (req, res) => {
-//   try {
-//     const { examDates } = req.body;
-
-//     if (!examDates) {
-//       return res.status(400).json({ message: "Exam dates required" });
-//     }
-
-//     const saved = await Settings.findOneAndUpdate(
-//       { key: "examDates" },
-//       { value: examDates },
-//       { upsert: true, new: true }
-//     );
-
-//     res.json({ success: true, examDates: saved.value });
-//   } catch (err) {
-//     console.log(err);
-//     res.status(500).json({ message: "Failed to save exam dates" });
-//   }
-// };
-
-// export const getExamDates = async (req, res) => {
-//   try {
-//     const data = await Settings.findOne({ key: "examDates" });
-
-//     res.json({
-//       examDates: data ? data.value : ""
-//     });
-//   } catch (err) {
-//     console.log(err);
-//     res.status(500).json({ message: "Failed to fetch exam dates" });
-//   }
-// };
 
 
 
@@ -127,5 +92,84 @@ export const setExamVisibility = async (req, res) => {
   } catch (err) {
     console.log("Visibility Save Error:", err);
     res.status(500).json({ message: "Failed to save visibility" });
+  }
+};
+
+/* --------------------- SAVE SESSION (e.g. 2025-26) --------------------- */
+export const saveSession = async (req, res) => {
+  try {
+    const { session } = req.body;
+
+    if (!session || typeof session !== "string") {
+      return res.status(400).json({ message: "Session is required (e.g. 2025-26)" });
+    }
+
+    const saved = await Settings.findOneAndUpdate(
+      { key: "session" },
+      { value: { session } },
+      { upsert: true, new: true }
+    );
+
+    res.json({
+      success: true,
+      session: saved.value.session,
+    });
+  } catch (err) {
+    console.log("Save Session Error:", err);
+    res.status(500).json({ message: "Failed to save session" });
+  }
+};
+
+/* --------------------- GET SESSION --------------------- */
+export const getSession = async (req, res) => {
+  try {
+    const setting = await Settings.findOne({ key: "session" });
+
+    res.json({
+      session: setting && setting.value && setting.value.session
+        ? setting.value.session
+        : "",
+    });
+  } catch (err) {
+    console.log("Get Session Error:", err);
+    res.status(500).json({ message: "Failed to fetch session" });
+  }
+};
+
+
+/* --------------------- SAVE ADMIT CARD NOTES --------------------- */
+export const saveAdmitNotes = async (req, res) => {
+  try {
+    const { validityNote, customNote } = req.body;
+
+    const saved = await Settings.findOneAndUpdate(
+      { key: "admitNotes" },
+      { value: { validityNote, customNote } },
+      { upsert: true, new: true }
+    );
+
+    res.json({
+      success: true,
+      notes: saved.value,
+    });
+  } catch (err) {
+    console.log("Save Admit Notes Error:", err);
+    res.status(500).json({ message: "Failed to save admit notes" });
+  }
+};
+
+/* --------------------- GET ADMIT CARD NOTES --------------------- */
+export const getAdmitNotes = async (req, res) => {
+  try {
+    const setting = await Settings.findOne({ key: "admitNotes" });
+
+    res.json({
+      notes: setting && setting.value
+        ? setting.value
+        : { validityNote: "", customNote: "" },
+    });
+  } catch (err) {
+    console.log("Get Admit Notes Error:", err);
+    res.status(500).json({ message: "Failed to fetch admit notes" });
   }
 };

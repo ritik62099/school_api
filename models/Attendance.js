@@ -1,5 +1,60 @@
 
 
+// import mongoose from 'mongoose';
+
+// const attendanceSchema = new mongoose.Schema(
+//   {
+//     // ✅ Store only date (not time)
+//     date: { 
+//       type: Date, 
+//       required: true,
+//       set: (d) => {
+//         const dt = new Date(d);
+//         dt.setHours(0, 0, 0, 0);
+//         return dt;
+//       }
+//     },
+
+//     // ✅ Class name or section (e.g., "10A", "12B")
+//     class: { 
+//       type: String, 
+//       required: true, 
+//       trim: true 
+//     },
+
+//     // ✅ Each student's attendance for the day
+//     records: [
+//       {
+//         studentId: { 
+//           type: mongoose.Schema.Types.ObjectId, 
+//           ref: 'Student', 
+//           required: true 
+//         },
+//         present: { 
+//           type: Boolean, 
+//           default: true, 
+//           required: true 
+//         }
+//       }
+//     ],
+
+//     // ✅ User who marked attendance
+//     markedBy: { 
+//       type: mongoose.Schema.Types.ObjectId, 
+//       ref: 'User', 
+//       required: true 
+//     }
+//   },
+//   { timestamps: true }
+// );
+
+// // ✅ Ensure unique attendance per class per date
+// attendanceSchema.index({ date: 1, class: 1 }, { unique: true });
+
+// export default mongoose.model('Attendance', attendanceSchema);
+
+
+// models/Attendance.js
 import mongoose from 'mongoose';
 
 const attendanceSchema = new mongoose.Schema(
@@ -15,11 +70,17 @@ const attendanceSchema = new mongoose.Schema(
       }
     },
 
-    // ✅ Class name or section (e.g., "10A", "12B")
+    // ✅ Class name (e.g., "5th", "10A")
     class: { 
       type: String, 
       required: true, 
       trim: true 
+    },
+
+    // ✅ NEW: School closed / holiday flag
+    isSchoolClosed: {
+      type: Boolean,
+      default: false,
     },
 
     // ✅ Each student's attendance for the day

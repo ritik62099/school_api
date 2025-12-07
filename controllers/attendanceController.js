@@ -1,85 +1,108 @@
+// controllers/attendanceController.js
 import Attendance from '../models/Attendance.js';
 import Student from '../models/Student.js';
 
+/**
+ * POST /api/attendance
+ * Mark or update attendance (also handles School Closed / Holiday)
+ */
 export const markAttendance = async (req, res) => {
   try {
-    const { date, class: className, records } = req.body;
+    const { date, class: className, records, isSchoolClosed } = req.body;
     
-    if (!date || !className || !Array.isArray(records)) {
+    // isSchoolClosed true hai to records ka array zaroori nahi
+    if (!date || !className || (!Array.isArray(records) && !isSchoolClosed)) {
       return res.status(400).json({ message: 'Invalid attendance data' });
     }
 
     // ✅ Permission check
     if (req.user.role === 'teacher' && !req.user.canMarkAttendance) {
-      return res.status(403).json({ message: 'You do not have permission to mark attendance' });
+      return res
+        .status(403)
+        .json({ message: 'You do not have permission to mark attendance' });
     }
 
-    // ✅ Convert date to start of day (ignoring time differences)
+    // ✅ Normalize date: start of day
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
 
     // ✅ Check if attendance exists for this date and class
-    let attendance = await Attendance.findOne({ 
-      date: normalizedDate, 
-      class: className 
+    let attendance = await Attendance.findOne({
+      date: normalizedDate,
+      class: className,
     });
 
     if (!attendance) {
-      // ✅ Create new document for this date
+      // ✅ Create new document
       attendance = new Attendance({
         date: normalizedDate,
         class: className,
-        records,
-        markedBy: req.user.id
+        isSchoolClosed: !!isSchoolClosed,
+        records: isSchoolClosed ? [] : records,
+        markedBy: req.user.id,
       });
     } else {
-      // ✅ Update existing records
-      records.forEach(record => {
-        const idx = attendance.records.findIndex(
-          r => r.studentId.toString() === record.studentId
-        );
-        if (idx !== -1) {
-          attendance.records[idx].present = record.present;
-        } else {
-          attendance.records.push(record);
-        }
-      });
+      // ✅ Update existing document
+      attendance.isSchoolClosed = !!isSchoolClosed;
+
+      if (isSchoolClosed) {
+        // School closed → koi records nahi
+        attendance.records = [];
+      } else {
+        // Normal attendance update
+        records.forEach((record) => {
+          const idx = attendance.records.findIndex(
+            (r) => r.studentId.toString() === record.studentId
+          );
+          if (idx !== -1) {
+            attendance.records[idx].present = record.present;
+          } else {
+            attendance.records.push(record);
+          }
+        });
+      }
     }
 
     await attendance.save();
-    res.status(200).json({ message: 'Attendance saved successfully', attendance });
-
+    res
+      .status(200)
+      .json({ message: 'Attendance saved successfully', attendance });
   } catch (err) {
     console.error('Attendance error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-// controllers/attendanceController.js
+/**
+ * GET /api/attendance?date=YYYY-MM-DD&class=ClassName
+ * Fetch attendance for a date & class
+ */
 export const getAttendanceByDateAndClass = async (req, res) => {
   try {
     const { date, class: className } = req.query;
-    
+
     if (!date || !className) {
-      return res.status(400).json({ message: 'Date and class are required' });
+      return res
+        .status(400)
+        .json({ message: 'Date and class are required' });
     }
 
     const queryDate = new Date(date);
     queryDate.setHours(0, 0, 0, 0);
 
-    // ✅ Find OR default to empty structure
     const attendance = await Attendance.findOne({
       date: queryDate,
-      class: className
+      class: className,
     });
 
     if (!attendance) {
-      // ✅ Return 200 with empty records instead of 404
+      // ✅ Return 200 with empty data, not 404
       return res.json({
         date: queryDate,
         class: className,
         records: [],
-        markedBy: null
+        markedBy: null,
+        isSchoolClosed: false,
       });
     }
 
@@ -90,47 +113,72 @@ export const getAttendanceByDateAndClass = async (req, res) => {
   }
 };
 
-// Helper: Dinon ki list banaye (1 se 31 tak, mahine ke hisaab se)
+/**
+ * Helper: get days in a month
+ */
 const getDaysInMonth = (year, month) => {
-  return new Date(year, month, 0).getDate(); // month = 1-12
+  return new Date(year, month, 0).getDate(); // month = 1–12
 };
 
-
+/**
+ * GET /api/attendance/student-monthly?studentId=...&year=2025&month=2
+ * Single student monthly attendance
+ */
 export const getStudentMonthlyAttendance = async (req, res) => {
   try {
     const { studentId, year, month } = req.query;
 
     if (!studentId || !year || !month) {
-      return res.status(400).json({ message: 'studentId, year, and month are required' });
+      return res
+        .status(400)
+        .json({ message: 'studentId, year, and month are required' });
     }
 
     const yearNum = parseInt(year);
     const monthNum = parseInt(month);
-    const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+    const daysInMonth = getDaysInMonth(yearNum, monthNum);
 
-    // Student info fetch karein
-    const student = await Student.findById(studentId).select('name class rollNo');
+    const student = await Student.findById(studentId).select(
+      'name class rollNo'
+    );
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
     const report = [];
+
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dateStr = `${yearNum}-${String(monthNum).padStart(
+        2,
+        '0'
+      )}-${String(day).padStart(2, '0')}`;
       const dateObj = new Date(dateStr);
       dateObj.setHours(0, 0, 0, 0);
 
       const attendance = await Attendance.findOne(
         { date: dateObj, class: student.class },
-        { records: 1 }
+        { records: 1, isSchoolClosed: 1 }
       );
 
-      const record = attendance?.records.find(r => r.studentId.toString() === studentId);
+      if (attendance?.isSchoolClosed) {
+        // Holiday: present null
+        report.push({
+          date: dateStr,
+          present: null,
+          isSchoolClosed: true,
+        });
+        continue;
+      }
+
+      const record = attendance?.records.find(
+        (r) => r.studentId.toString() === studentId
+      );
       const present = record ? record.present : false;
 
       report.push({
         date: dateStr,
-        present
+        present,
+        isSchoolClosed: false,
       });
     }
 
@@ -139,9 +187,9 @@ export const getStudentMonthlyAttendance = async (req, res) => {
         id: student._id,
         name: student.name,
         class: student.class,
-        rollNo: student.rollNo
+        rollNo: student.rollNo,
       },
-      report
+      report,
     });
   } catch (err) {
     console.error('Student Monthly Report Error:', err);
@@ -149,7 +197,10 @@ export const getStudentMonthlyAttendance = async (req, res) => {
   }
 };
 
-// Get total attendance for a student in a session (e.g., 2025-26)
+/**
+ * GET /api/attendance/student-total/:studentId
+ * Total attendance for a student (for whole session)
+ */
 export const getStudentTotalAttendance = async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -158,15 +209,24 @@ export const getStudentTotalAttendance = async (req, res) => {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    // Get all attendance records for this student's class
-    const attendanceRecords = await Attendance.find({ class: student.class });
+    const attendanceRecords = await Attendance.find({
+      class: student.class,
+    });
 
     let totalSchoolDays = 0;
     let totalPresentDays = 0;
 
-    attendanceRecords.forEach(att => {
-      totalSchoolDays++; // Each document = 1 school day
-      const studentRecord = att.records.find(r => r.studentId.toString() === studentId);
+    attendanceRecords.forEach((att) => {
+      // 👇 Closed / Holiday day ko ignore karo
+      if (att.isSchoolClosed) {
+        return;
+      }
+
+      totalSchoolDays++; // only open days
+
+      const studentRecord = att.records.find(
+        (r) => r.studentId.toString() === studentId
+      );
       if (studentRecord && studentRecord.present) {
         totalPresentDays++;
       }
@@ -175,7 +235,10 @@ export const getStudentTotalAttendance = async (req, res) => {
     res.json({
       totalSchoolDays,
       totalPresentDays,
-      percentage: totalSchoolDays > 0 ? ((totalPresentDays / totalSchoolDays) * 100).toFixed(2) : 0
+      percentage:
+        totalSchoolDays > 0
+          ? ((totalPresentDays / totalSchoolDays) * 100).toFixed(2)
+          : 0,
     });
   } catch (err) {
     console.error('Total Attendance Error:', err);
@@ -183,20 +246,28 @@ export const getStudentTotalAttendance = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/attendance/monthly-report?class=5th&year=2025&month=2
+ * Class-wise monthly attendance summary
+ */
 export const getMonthlyAttendanceReport = async (req, res) => {
   try {
     const { class: className, year, month } = req.query;
 
     if (!className || !year || !month) {
-      return res.status(400).json({ message: 'Class, year, and month are required' });
+      return res
+        .status(400)
+        .json({ message: 'Class, year, and month are required' });
     }
 
     // ✅ Permission check for teachers
     if (req.user.role === 'teacher') {
-      const assignedClasses = (req.user.teachingAssignments || []).map(a => a.class);
+      const assignedClasses = (req.user.teachingAssignments || []).map(
+        (a) => a.class
+      );
       if (!assignedClasses.includes(className)) {
         return res.status(403).json({
-          message: `You are not authorized to view attendance for class ${className}`
+          message: `You are not authorized to view attendance for class ${className}`,
         });
       }
     }
@@ -210,19 +281,43 @@ export const getMonthlyAttendanceReport = async (req, res) => {
 
     const totalStudents = await Student.countDocuments({ class: className });
     if (totalStudents === 0) {
-      return res.status(404).json({ message: 'No students found in this class' });
+      return res
+        .status(404)
+        .json({ message: 'No students found in this class' });
     }
 
-    const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+    const daysInMonth = getDaysInMonth(yearNum, monthNum);
     const report = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dateStr = `${yearNum}-${String(monthNum).padStart(
+        2,
+        '0'
+      )}-${String(day).padStart(2, '0')}`;
       const dateObj = new Date(dateStr);
       dateObj.setHours(0, 0, 0, 0);
 
-      const attendance = await Attendance.findOne({ date: dateObj, class: className });
-      const presentCount = attendance ? attendance.records.filter(r => r.present).length : 0;
+      const attendance = await Attendance.findOne({
+        date: dateObj,
+        class: className,
+      });
+
+      if (attendance && attendance.isSchoolClosed) {
+        // Holiday: sab 0, flag true
+        report.push({
+          date: dateStr,
+          totalStudents,
+          present: 0,
+          absent: 0,
+          marked: true,
+          isSchoolClosed: true,
+        });
+        continue;
+      }
+
+      const presentCount = attendance
+        ? attendance.records.filter((r) => r.present).length
+        : 0;
       const absentCount = totalStudents - presentCount;
 
       report.push({
@@ -230,7 +325,8 @@ export const getMonthlyAttendanceReport = async (req, res) => {
         totalStudents,
         present: presentCount,
         absent: absentCount,
-        marked: !!attendance
+        marked: !!attendance,
+        isSchoolClosed: false,
       });
     }
 
