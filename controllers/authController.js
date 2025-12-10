@@ -4,21 +4,24 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
-import { generateOtp, sendOtpEmail } from '../utils/sendOtp.js'; // .js add karein
+import { generateOtp, sendOtpEmail } from '../utils/sendOtp.js';
 
-// @route   POST /api/auth/request-otp
-const requestOtp = async (req, res) => {
+// 📩 POST /api/auth/request-otp
+export const requestOtp = async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: 'Email is required.' });
 
   try {
     const existingUser = await User.findOne({ email, isOtpOnly: false });
-    if (existingUser) return res.status(400).json({ message: 'Email already registered.' });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered.' });
+    }
 
+    // purana temp user delete
     await User.deleteOne({ email, isOtpOnly: true });
 
     const otp = generateOtp();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
 
     const tempUser = new User({
       email,
@@ -37,12 +40,12 @@ const requestOtp = async (req, res) => {
   }
 };
 
-// @desc    Signup user (no OTP)
-// @route   POST /api/auth/signup
-const signup = async (req, res) => {
+// 👤 POST /api/auth/signup
+export const signup = async (req, res) => {
   const { name, email, password } = req.body;
-  if (!name || !email || !password)
+  if (!name || !email || !password) {
     return res.status(400).json({ message: 'All fields are required.' });
+  }
 
   try {
     const existingUser = await User.findOne({ email });
@@ -73,10 +76,10 @@ const signup = async (req, res) => {
         role: user.role,
         assignedClasses: user.assignedClasses,
         assignedSubjects: user.assignedSubjects,
-        canMarkAttendance: user.canMarkAttendance || false
+        canMarkAttendance: user.canMarkAttendance || false,
       },
       process.env.JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: '365d' } // 🔥 1 din valid
     );
 
     res.status(201).json({
@@ -86,8 +89,8 @@ const signup = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        isApproved: user.isApproved
-      }
+        isApproved: user.isApproved,
+      },
     });
   } catch (err) {
     console.error('Signup Error:', err);
@@ -95,14 +98,18 @@ const signup = async (req, res) => {
   }
 };
 
-// @route   POST /api/auth/login
-const login = async (req, res) => {
+// 🔑 POST /api/auth/login
+export const login = async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ message: 'Email and password are required.' });
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required.' });
+  }
 
   try {
     const user = await User.findOne({ email });
-    if (!user || !user.password) return res.status(400).json({ message: 'Invalid credentials.' });
+    if (!user || !user.password) {
+      return res.status(400).json({ message: 'Invalid credentials.' });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials.' });
@@ -114,10 +121,10 @@ const login = async (req, res) => {
         role: user.role,
         assignedClasses: user.assignedClasses || [],
         assignedSubjects: user.assignedSubjects || [],
-        canMarkAttendance: user.canMarkAttendance || false
+        canMarkAttendance: user.canMarkAttendance || false,
       },
       process.env.JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: '365d' } // 🔥 1 din valid
     );
 
     res.status(200).json({
@@ -127,8 +134,8 @@ const login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        isApproved: user.isApproved
-      }
+        isApproved: user.isApproved,
+      },
     });
   } catch (err) {
     console.error('Login Error:', err);
@@ -136,19 +143,15 @@ const login = async (req, res) => {
   }
 };
 
-// controllers/authController.js
+// 🙋‍♂️ GET /api/auth/me  (protected)
 export const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // ✅ Flatten Maps
     res.json(user.toObject({ flattenMaps: true }));
   } catch (err) {
+    console.error('GetMe Error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
-
-
-// ✅ ESM mein export
-export { requestOtp, signup, login };

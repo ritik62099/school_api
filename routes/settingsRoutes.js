@@ -1,13 +1,3 @@
-// import express from "express";
-// import { saveExamDates ,getExamDates} from "../controllers/settingsController.js";
-// import {auth} from "../middleware/auth.js";
-// const router = express.Router();
-
-// router.post("/exam-dates", auth, saveExamDates);
-// router.get("/exam-dates", auth, getExamDates);
-
-// export default router;
-
 
 import express from "express";
 import { 

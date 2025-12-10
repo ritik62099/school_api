@@ -1,3 +1,5 @@
+
+
 // middleware/auth.js
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
@@ -8,6 +10,7 @@ export const auth = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
     const user = await User.findById(decoded.id).select('-password -otp -otpExpires');
     if (!user) return res.status(401).json({ message: 'User not found' });
 
@@ -18,12 +21,16 @@ export const auth = async (req, res, next) => {
       assignedClasses: user.assignedClasses || [],
       assignedSubjects: user.assignedSubjects || [],
       teachingAssignments: user.teachingAssignments || [],
-       canMarkAttendance: (user.teachingAssignments || []).some(a => a.canMarkAttendance === true)
+      canMarkAttendance: (user.teachingAssignments || []).some(
+        (a) => a.canMarkAttendance === true
+      ),
     };
 
     next();
   } catch (err) {
-    console.error(err);
+    console.error('Auth middleware error:', err);
     res.status(400).json({ message: 'Invalid token' });
   }
 };
+
+export default auth; // optional, agar kahin default se import karna ho

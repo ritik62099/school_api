@@ -336,3 +336,105 @@ export const getMonthlyAttendanceReport = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// 📊 School-wide daily summary
+export const getSchoolDailySummary = async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ message: "Date is required (YYYY-MM-DD)" });
+    }
+
+    const queryDate = new Date(date);
+    queryDate.setHours(0, 0, 0, 0);
+
+    // 1️⃣ Sab classes ke student count
+    const classCountsAgg = await Student.aggregate([
+      { $group: { _id: "$class", totalStudents: { $sum: 1 } } },
+    ]);
+
+    if (classCountsAgg.length === 0) {
+      return res.json({
+        date: queryDate,
+        totalStudents: 0,
+        totalPresent: 0,
+        totalAbsent: 0,
+        classes: [],
+      });
+    }
+
+    const classCountsMap = {};
+    let schoolTotalStudents = 0;
+
+    classCountsAgg.forEach((item) => {
+      const cls = item._id || "Unassigned";
+      classCountsMap[cls] = item.totalStudents;
+      schoolTotalStudents += item.totalStudents;
+    });
+
+    // 2️⃣ Us date ke saare attendance docs
+    const attendanceDocs = await Attendance.find({ date: queryDate });
+
+    const attendanceMap = {};
+    attendanceDocs.forEach((doc) => {
+      attendanceMap[doc.class] = doc;
+    });
+
+    const classesSummary = [];
+    let totalPresent = 0;
+
+    for (const [cls, totalStudents] of Object.entries(classCountsMap)) {
+      const att = attendanceMap[cls];
+
+      // Class holiday / school closed
+      if (att && att.isSchoolClosed) {
+        classesSummary.push({
+          class: cls,
+          totalStudents,
+          present: 0,
+          absent: 0,
+          marked: true,
+          isSchoolClosed: true,
+        });
+        // NOTE: yahan hum closed classes ko present/absent me count nahi kar rahe
+        continue;
+      }
+
+      let presentCount = 0;
+      let marked = false;
+
+      if (att) {
+        marked = true;
+        presentCount = att.records.filter((r) => r.present).length;
+      }
+
+      const absentCount = totalStudents - presentCount;
+
+      classesSummary.push({
+        class: cls,
+        totalStudents,
+        present: presentCount,
+        absent: absentCount,
+        marked,
+        isSchoolClosed: false,
+      });
+
+      totalPresent += presentCount;
+    }
+
+    // Closed classes ke students "not present" me count ho jayenge, isliye:
+    const totalAbsent = schoolTotalStudents - totalPresent;
+
+    res.json({
+      date: queryDate,
+      totalStudents: schoolTotalStudents,
+      totalPresent,
+      totalAbsent,
+      classes: classesSummary,
+    });
+  } catch (err) {
+    console.error("School Daily Summary Error:", err);
+    res.status(500).json({ message: "Server error while fetching school summary" });
+  }
+};
