@@ -1,4 +1,5 @@
 // controllers/attendanceController.js
+import mongoose from "mongoose";
 import Attendance from '../models/Attendance.js';
 import Student from '../models/Student.js';
 
@@ -245,6 +246,58 @@ export const getStudentTotalAttendance = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+/**
+ * GET /api/attendance/student-total-bulk?ids=1,2,3
+ * Bulk total attendance for multiple students
+ */
+export const getAttendanceBulk = async (req, res) => {
+  try {
+    const studentIds = req.query.ids?.split(",") || [];
+
+    if (!studentIds.length) {
+      return res.json({});
+    }
+
+    const data = await Attendance.aggregate([
+      { $unwind: "$records" },
+      {
+        $match: {
+          "records.studentId": {
+            $in: studentIds.map(id => new mongoose.Types.ObjectId(id))
+          }
+        }
+      },
+      {
+        $group: {
+          _id: "$records.studentId",
+          present: {
+            $sum: { $cond: ["$records.present", 1, 0] }
+          },
+          total: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const result = {};
+    data.forEach(d => {
+      result[d._id] = {
+        present: d.present,
+        total: d.total,
+        percentage: d.total
+          ? ((d.present / d.total) * 100).toFixed(2)
+          : "0.00"
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("Attendance bulk error:", err);
+    res.status(500).json({ message: "Attendance bulk error" });
+  }
+};
+
+
 
 /**
  * GET /api/attendance/monthly-report?class=5th&year=2025&month=2
