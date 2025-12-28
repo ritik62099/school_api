@@ -231,7 +231,7 @@ export const getMarksByStudent = async (req, res) => {
   try {
     const { studentId } = req.params;
     const marks = await Marks.findOne({ studentId })
-      .populate("studentId", "name fatherName motherName phone address rollNo attendance class section")
+      .populate("studentId", "name fatherName motherName mobile address rollNo attendance class section")
       .lean();
 
     if (!marks) {
@@ -249,7 +249,7 @@ export const getMarksByStudent = async (req, res) => {
 export const getAllMarks = async (req, res) => {
   try {
     const marksDocs = await Marks.find()
-      .populate("studentId", "name fatherName motherName phone address rollNo attendance class section photo")
+      .populate("studentId", "name fatherName motherName mobile  address rollNo attendance class section photo")
       .lean();
 
     // Group by class
