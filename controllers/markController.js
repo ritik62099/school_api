@@ -10,23 +10,39 @@ import ClassSubjectMapping from "../models/ClassSubjectMapping.js";
  */
 const isDrawingSubject = (sub) => String(sub || "").trim().toLowerCase() === "drawing";
 
+const isAbsentOrGrade = (val) => {
+  if (val === undefined || val === null) return false;
+  const v = String(val).toUpperCase();
+  return ["AB", "A", "B", "C", "D"].includes(v);
+};
+
 /**
  * Get mark value for a subject in an exam object.
  * - For drawing: return string grade ("" if not present)
  * - For numeric subjects: return number (0 if missing / invalid)
  */
 const getMarkValue = (examObj, subject) => {
-  if (!examObj) return subject && isDrawingSubject(subject) ? "" : 0;
+  if (!examObj) return isDrawingSubject(subject) ? "" : 0;
+
   const raw = examObj[subject];
 
+  // Drawing subject → return grade string
   if (isDrawingSubject(subject)) {
     if (raw === undefined || raw === null) return "";
-    return String(raw);
+    return String(raw).toUpperCase();
+  }
+
+  // Numeric subjects: AB / A / B / C / D => 0
+  if (isAbsentOrGrade(raw)) {
+    return 0;
   }
 
   const num = parseFloat(raw);
   return isNaN(num) ? 0 : num;
 };
+
+
+
 
 /**
  * Calculate weighted total and per-subject details.
@@ -140,10 +156,16 @@ export const addMarks = async (req, res) => {
           const grade = raw && GRADE_ALLOWED.has(String(raw)) ? String(raw).toUpperCase() : "";
           sanitizedExams[examKey][sub] = grade;
         } else {
-          const val = getMarkValue(exams[examKey], sub);
-          const num = Number(val) || 0;
-          sanitizedExams[examKey][sub] = Math.min(Math.max(num, 0), 20);
-        }
+  const raw = exams[examKey] && exams[examKey][sub];
+
+  if (isAbsentOrGrade(raw)) {
+    sanitizedExams[examKey][sub] = String(raw).toUpperCase();
+  } else {
+    const num = Number(raw) || 0;
+    sanitizedExams[examKey][sub] = Math.min(Math.max(num, 0), 20);
+  }
+}
+
       });
     });
 
@@ -155,10 +177,16 @@ export const addMarks = async (req, res) => {
           const grade = raw && GRADE_ALLOWED.has(String(raw)) ? String(raw).toUpperCase() : "";
           sanitizedExams[examKey][sub] = grade;
         } else {
-          const val = getMarkValue(exams[examKey], sub);
-          const num = Number(val) || 0;
-          sanitizedExams[examKey][sub] = Math.min(Math.max(num, 0), 80);
-        }
+  const raw = exams[examKey] && exams[examKey][sub];
+
+  if (isAbsentOrGrade(raw)) {
+    sanitizedExams[examKey][sub] = String(raw).toUpperCase();
+  } else {
+    const num = Number(raw) || 0;
+    sanitizedExams[examKey][sub] = Math.min(Math.max(num, 0), 80);
+  }
+}
+
       });
     });
 
