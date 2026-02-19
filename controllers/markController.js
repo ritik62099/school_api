@@ -146,7 +146,8 @@ export const addMarks = async (req, res) => {
     };
 
     // Allowed grade letters for drawing
-    const GRADE_ALLOWED = new Set(["A","B","C","D","a","b","c","d"]);
+    const GRADE_ALLOWED = new Set(["A","AB","B","C","D","a","ab","b","c","d"]);
+
 
     // Small exams (max 20)
     ["pa1", "pa2", "pa3", "pa4"].forEach(examKey => {
