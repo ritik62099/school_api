@@ -105,10 +105,17 @@ const calculateWeightedTotal = (exams = {}, subjects = []) => {
   }
 
   const overallAverage = countedSubjects ? aggregateSum / countedSubjects : 0;
-  return {
-    total: parseFloat(overallAverage.toFixed(2)),
-    details
-  };
+
+// fix floating + clamp
+const safeTotal = Math.min(
+  100,
+  Math.max(0, Number(overallAverage.toFixed(2)))
+);
+
+return {
+  total: safeTotal,
+  details
+};
 };
 
 /**
@@ -239,7 +246,10 @@ export const addMarks = async (req, res) => {
         calculateWeightedTotal(finalExams, subjects);
 
       marksDoc.exams = finalExams;
-      marksDoc.weightedTotal = weightedTotal;
+      marksDoc.weightedTotal = Math.min(
+  100,
+  Math.max(0, Number(weightedTotal))
+);
       marksDoc.weightedDetails = weightedDetails;
     }
 
