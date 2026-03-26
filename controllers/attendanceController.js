@@ -10,7 +10,7 @@ import Student from '../models/Student.js';
 export const markAttendance = async (req, res) => {
   try {
     const { date, class: className, records, isSchoolClosed } = req.body;
-    
+
     // isSchoolClosed true hai to records ka array zaroori nahi
     if (!date || !className || (!Array.isArray(records) && !isSchoolClosed)) {
       return res.status(400).json({ message: 'Invalid attendance data' });
@@ -251,44 +251,201 @@ export const getStudentTotalAttendance = async (req, res) => {
  * GET /api/attendance/student-total-bulk?ids=1,2,3
  * Bulk total attendance for multiple students
  */
+// export const getAttendanceBulk = async (req, res) => {
+//   try {
+//     const studentIds = req.query.ids?.split(",") || [];
+
+//     if (!studentIds.length) {
+//       return res.json({});
+//     }
+
+//     const data = await Attendance.aggregate([
+//       { $unwind: "$records" },
+//       {
+//         $match: {
+//           "records.studentId": {
+//             $in: studentIds.map(id => new mongoose.Types.ObjectId(id))
+//           }
+//         }
+//       },
+//       {
+//         $group: {
+//           _id: "$records.studentId",
+//           present: {
+//             $sum: { $cond: ["$records.present", 1, 0] }
+//           },
+//           total: { $sum: 1 }
+//         }
+//       }
+//     ]);
+
+//     const result = {};
+//     data.forEach(d => {
+//       result[d._id] = {
+//         present: d.present,
+//         total: d.total,
+//         percentage: d.total
+//           ? ((d.present / d.total) * 100).toFixed(2)
+//           : "0.00"
+//       };
+//     });
+
+//     res.json(result);
+//   } catch (err) {
+//     console.error("Attendance bulk error:", err);
+//     res.status(500).json({ message: "Attendance bulk error" });
+//   }
+// };
+
+
 export const getAttendanceBulk = async (req, res) => {
   try {
-    const studentIds = req.query.ids?.split(",") || [];
+    const studentIds = req.query.ids?.split(",").filter(Boolean) || [];
+    const session = String(req.query.session || "").trim(); // e.g. 2025-26
 
-    if (!studentIds.length) {
-      return res.json({});
-    }
+    if (!studentIds.length) return res.json({});
 
-    const data = await Attendance.aggregate([
-      { $unwind: "$records" },
-      {
-        $match: {
-          "records.studentId": {
-            $in: studentIds.map(id => new mongoose.Types.ObjectId(id))
-          }
-        }
-      },
-      {
-        $group: {
-          _id: "$records.studentId",
-          present: {
-            $sum: { $cond: ["$records.present", 1, 0] }
-          },
-          total: { $sum: 1 }
-        }
-      }
-    ]);
+    const students = await Student.find({
+      _id: { $in: studentIds.map((id) => new mongoose.Types.ObjectId(id)) }
+    }).select("_id class");
+
+    const classWiseStudents = {};
+    students.forEach((s) => {
+      const cls = s.class || "UNKNOWN";
+      if (!classWiseStudents[cls]) classWiseStudents[cls] = [];
+      classWiseStudents[cls].push(String(s._id));
+    });
 
     const result = {};
-    data.forEach(d => {
-      result[d._id] = {
-        present: d.present,
-        total: d.total,
-        percentage: d.total
-          ? ((d.present / d.total) * 100).toFixed(2)
-          : "0.00"
-      };
+    studentIds.forEach((id) => {
+      result[id] = { present: 0, total: 0, percentage: "0.00" };
     });
+
+    const toYMD = (date) => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+
+    const startOfDay = (d) => {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    };
+
+    const parseSessionRange = (sessionText) => {
+      // 2025-26 => 01 Apr 2025 to 31 Mar 2026
+      const m = sessionText.match(/^(\d{4})-(\d{2}|\d{4})$/);
+      if (!m) return null;
+
+      const startYear = Number(m[1]);
+      const endYear =
+        m[2].length === 2
+          ? Number(`${String(startYear).slice(0, 2)}${m[2]}`)
+          : Number(m[2]);
+
+      return {
+        start: new Date(startYear, 3, 1), // April 1
+        end: new Date(endYear, 2, 31),    // March 31
+      };
+    };
+
+    const sessionRange = parseSessionRange(session);
+    if (!sessionRange) {
+      return res.status(400).json({ message: "Valid session required, e.g. 2025-26" });
+    }
+
+    const today = startOfDay(new Date());
+    const effectiveEnd = sessionRange.end > today ? today : sessionRange.end;
+
+    for (const [className, ids] of Object.entries(classWiseStudents)) {
+      const attendanceDocs = await Attendance.find({
+        class: className,
+        date: {
+          $gte: sessionRange.start,
+          $lte: effectiveEnd,
+        },
+      }).select("records isSchoolClosed date").sort({ date: 1 });
+
+      // date wise unique doc
+      const docMap = new Map();
+
+      for (const doc of attendanceDocs) {
+        const key = toYMD(doc.date);
+
+        if (!docMap.has(key)) {
+          docMap.set(key, {
+            isSchoolClosed: !!doc.isSchoolClosed,
+            records: doc.records || [],
+          });
+        } else {
+          const existing = docMap.get(key);
+
+          // open day ko prefer karo
+          if (existing.isSchoolClosed && !doc.isSchoolClosed) {
+            docMap.set(key, {
+              isSchoolClosed: false,
+              records: doc.records || [],
+            });
+          } else if (!existing.isSchoolClosed && !doc.isSchoolClosed) {
+            // duplicate open docs me latest overwrite
+            docMap.set(key, {
+              isSchoolClosed: false,
+              records: doc.records || [],
+            });
+          }
+        }
+      }
+
+      // April to March tak saare working days banao
+      const workingDayKeys = [];
+      const cur = new Date(sessionRange.start);
+      cur.setHours(0, 0, 0, 0);
+
+      while (cur <= effectiveEnd) {
+        const key = toYMD(cur);
+        const day = cur.getDay(); // 0 = Sunday
+        const doc = docMap.get(key);
+
+        // Sunday skip
+        if (day !== 0) {
+          // holiday marked hai to skip
+          if (!(doc && doc.isSchoolClosed)) {
+            workingDayKeys.push(key);
+          }
+        }
+
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      const totalWorkingDays = workingDayKeys.length;
+
+      ids.forEach((studentId) => {
+        let presentDays = 0;
+
+        workingDayKeys.forEach((key) => {
+          const dayDoc = docMap.get(key);
+          if (!dayDoc || dayDoc.isSchoolClosed) return;
+
+          const rec = dayDoc.records.find(
+            (r) => String(r.studentId) === String(studentId)
+          );
+
+          if (rec?.present === true) presentDays++;
+        });
+
+        result[studentId] = {
+          present: presentDays,
+          total: totalWorkingDays,
+          percentage: totalWorkingDays
+            ? ((presentDays / totalWorkingDays) * 100).toFixed(2)
+            : "0.00",
+        };
+      });
+    }
 
     res.json(result);
   } catch (err) {
@@ -296,8 +453,6 @@ export const getAttendanceBulk = async (req, res) => {
     res.status(500).json({ message: "Attendance bulk error" });
   }
 };
-
-
 
 /**
  * GET /api/attendance/monthly-report?class=5th&year=2025&month=2
